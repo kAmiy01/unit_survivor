@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>単位サバイバル</title>
+    
+    <!-- 1. Tailwind CSS (デザインフレームワーク) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. Lucide Icons (アイコンライブラリ) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Tailwindでカバーしきれない微調整 */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
+        
+        /* アニメーション定義 */
+        @keyframes slide-up {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        .animate-slide-up { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        
+        @keyframes fade-in {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .animate-fade-in { animation: fade-in 0.2s ease-out; }
+
+        /* スクロールバー非表示 (見た目すっきり) */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+
+    <!-- === 1. ログイン画面 === -->
+    <div id="login-screen" class="min-h-screen flex flex-col justify-center p-6">
+        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm mx-auto">
+            <div class="text-center mb-10">
+                <h1 class="text-3xl font-black text-slate-800 mb-2">単位<br/>サバイバル</h1>
+                <p className="text-sm text-slate-500 font-medium">落単回避の最終兵器</p>
+            </div>
+            <form id="login-form" class="space-y-5">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">ID / 学籍番号</label>
+                    <input type="text" class="w-full p-4 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-lg" placeholder="20240001" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">パスワード</label>
+                    <input type="password" class="w-full p-4 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-lg" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold py-4 rounded-xl shadow-lg transition transform active:scale-95">
+                    ログインして開始
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- === 2. メインアプリ画面 (初期非表示) === -->
+    <div id="app-screen" class="hidden flex flex-col min-h-screen pb-24">
+        
+        <!-- ヘッダー -->
+        <header class="bg-white/90 backdrop-blur-md sticky top-0 z-20 border-b border-slate-200">
+            <div class="px-4 py-3 flex justify-between items-center">
+                <h1 class="text-lg font-black text-slate-800 flex items-center gap-2">
+                    <i data-lucide="book-open" class="text-blue-600 w-6 h-6"></i>
+                    単位サバイバル
+                </h1>
+                <button id="reset-btn" class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded hover:bg-red-50 hover:text-red-500 transition">
+                    初期化
+                </button>
+            </div>
+        </header>
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 p-3 md:p-6 max-w-2xl mx-auto space-y-4 w-full">
+            <!-- ダッシュボードビュー -->
+            <div id="view-dashboard" class="space-y-4">
+                <!-- ここにJSでカードが挿入されます -->
+                <div id="course-list" class="space-y-4"></div>
+                
+                <div class="text-center py-6">
+                    <p class="text-xs text-slate-400 font-medium">全ての授業を表示しました</p>
+                </div>
+            </div>
+
+            <!-- カレンダービュー (プレースホルダー) -->
+            <div id="view-calendar" class="hidden flex flex-col items-center justify-center h-[60vh] text-slate-400 p-8 text-center">
+                <div class="w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center mb-6">
+                    <i data-lucide="calendar" class="text-slate-400 w-10 h-10"></i>
+                </div>
+                <h3 class="text-lg font-bold text-slate-600 mb-2">カレンダーは準備中</h3>
+                <p class="text-sm">今後のアップデートで、スケジュール形式での管理が可能になります。</p>
+            </div>
+        </main>
+
+        <!-- ボトムナビゲーション -->
+        <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 pb-safe pt-2 px-6 flex justify-around shadow-[0_-5px_20px_rgba(0,0,0,0.05)] z-30 h-[80px]">
+            <button onclick="switchTab('dashboard')" id="nav-dashboard" class="flex flex-col items-center w-16 transition text-blue-600 -translate-y-1">
+                <div class="p-2 rounded-full mb-1 bg-blue-50" id="nav-icon-bg-dashboard">
+                    <i data-lucide="check-circle" class="w-6 h-6" stroke-width="3"></i>
+                </div>
+                <span class="text-[10px] font-bold">授業</span>
+            </button>
+            
+            <button onclick="switchTab('calendar')" id="nav-calendar" class="flex flex-col items-center w-16 transition text-slate-400">
+                <div class="p-2 rounded-full mb-1" id="nav-icon-bg-calendar">
+                    <i data-lucide="calendar" class="w-6 h-6" stroke-width="2"></i>
+                </div>
+                <span class="text-[10px] font-bold">予定</span>
+            </button>
+    
+            <button class="flex flex-col items-center w-16 text-slate-300">
+               <div class="p-2 rounded-full mb-1">
+                <i data-lucide="user" class="w-6 h-6" stroke-width="2"></i>
+               </div>
+              <span class="text-[10px] font-bold">共有</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- === 3. 編集モーダル (初期非表示) === -->
+    <div id="edit-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-end sm:items-center justify-center backdrop-blur-sm animate-fade-in">
+        <div class="bg-white w-full sm:w-full sm:max-w-lg h-[85vh] sm:h-auto sm:max-h-[90vh] rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col animate-slide-up">
+            
+            <!-- モーダルヘッダー -->
+            <div class="p-4 border-b flex items-center justify-between sticky top-0 bg-white rounded-t-3xl z-10">
+                <h2 class="text-lg font-bold flex items-center gap-2 text-slate-800">
+                    <i data-lucide="edit-3" class="w-5 h-5"></i> 設定変更
+                </h2>
+                <button id="close-modal-btn" class="p-2 bg-slate-100 rounded-full hover:bg-slate-200">
+                    <i data-lucide="chevron-down" class="text-slate-600 w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- モーダルコンテンツ (フォーム) -->
+            <div class="flex-1 overflow-y-auto p-5 space-y-6">
+                <input type="hidden" id="edit-id">
+                
+                <!-- 基本情報 -->
+                <div class="space-y-4">
+                    <h3 class="text-xs font-black text-slate-400 uppercase tracking-wider">基本情報</h3>
+                    <div class="grid grid-cols-1 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">授業名</label>
+                            <input type="text" id="edit-name" class="w-full p-3 bg-slate-50 rounded-xl font-bold text-slate-800 border-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1">教授名</label>
+                                <input type="text" id="edit-professor" class="w-full p-3 bg-slate-50 rounded-xl text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1">教室</label>
+                                <input type="text" id="edit-room" class="w-full p-3 bg-slate-50 rounded-xl text-sm">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- サバイバルルール -->
+                <div class="space-y-4">
+                    <h3 class="text-xs font-black text-orange-400 uppercase tracking-wider">サバイバルルール</h3>
+                    <div class="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-orange-800 mb-1">欠席上限 (回)</label>
+                                <input type="number" id="edit-absentLimit" class="w-full p-3 bg-white rounded-lg text-center font-bold text-lg border-orange-200">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-orange-800 mb-1">遅刻換算 (N遅刻=1欠)</label>
+                                <input type="number" id="edit-lateToAbsentRatio" class="w-full p-3 bg-white rounded-lg text-center font-bold text-lg border-orange-200">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 自己評価 -->
+                <div class="space-y-4">
+                    <h3 class="text-xs font-black text-slate-400 uppercase tracking-wider">自己評価</h3>
+                    <div class="bg-slate-50 p-4 rounded-xl space-y-3">
+                        <!-- 楽さ -->
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs font-bold text-slate-600">授業の楽さ</label>
+                            <div class="flex items-center gap-3">
+                                <input type="range" id="edit-rating-fun" min="1" max="5" class="w-24 accent-blue-600" oninput="document.getElementById('val-fun').innerText = this.value">
+                                <span id="val-fun" class="text-sm font-bold bg-white w-8 h-8 flex items-center justify-center rounded-full shadow-sm">3</span>
+                            </div>
+                        </div>
+                        <!-- 厳しさ -->
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs font-bold text-slate-600">教授の厳しさ</label>
+                            <div class="flex items-center gap-3">
+                                <input type="range" id="edit-rating-strictness" min="1" max="5" class="w-24 accent-blue-600" oninput="document.getElementById('val-strictness').innerText = this.value">
+                                <span id="val-strictness" class="text-sm font-bold bg-white w-8 h-8 flex items-center justify-center rounded-full shadow-sm">3</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- メモ -->
+                <div>
+                    <label class="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">メモ</label>
+                    <textarea id="edit-memo" class="w-full p-3 bg-slate-50 rounded-xl text-sm min-h-[100px]"></textarea>
+                </div>
+            </div>
+
+            <!-- モーダルフッター -->
+            <div class="p-4 border-t bg-white safe-area-bottom rounded-b-2xl">
+                <button id="save-course-btn" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-blue-700 active:scale-98 transition flex items-center justify-center gap-2">
+                    <i data-lucide="save" class="w-5 h-5"></i> 設定を保存
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- === JavaScript (ロジック) === -->
+    <script>
+        // --- データ定義 ---
+        const INITIAL_COURSES = [
+            { id: 1, name: '線形代数学 I', professor: '数理 太郎', room: '301教室', credit: 2, absentLimit: 5, lateToAbsentRatio: 3, absentCount: 0, lateCount: 0, ratings: { difficulty: 3, strictness: 4, fun: 2, report: 3, overall: 3 }, memo: 'テストが難しいらしい。', day: '月曜1限' },
+            { id: 2, name: 'プログラミング基礎', professor: '情報 次郎', room: 'PC室 A', credit: 2, absentLimit: 4, lateToAbsentRatio: 2, absentCount: 1, lateCount: 1, ratings: { difficulty: 2, strictness: 2, fun: 5, overall: 4, report: 4 }, memo: '課題さえ出せば単位は来る。', day: '月曜2限' },
+            { id: 3, name: '英語コミュニケーション', professor: 'Smith John', room: '別館 202', credit: 1, absentLimit: 3, lateToAbsentRatio: 3, absentCount: 0, lateCount: 0, ratings: { difficulty: 1, strictness: 5, fun: 4, overall: 3, report: 1 }, memo: '出席点重視。絶対休むな。', day: '火曜1限' },
+            { id: 4, name: '物理学実験', professor: '物理 花子', room: '実験室', credit: 2, absentLimit: 0, lateToAbsentRatio: 1, absentCount: 0, lateCount: 0, ratings: { difficulty: 5, strictness: 5, fun: 3, overall: 2, report: 5 }, memo: '遅刻厳禁。白衣忘れるな。', day: '水曜3限' }
+        ];
+
+        // --- ステート管理 ---
+        let courses = [];
+        
+        // --- 初期化処理 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // ローカルストレージから読み込み
+            const savedData = localStorage.getItem('unitSurvivalData');
+            if (savedData) {
+                courses = JSON.parse(savedData);
+            } else {
+                courses = JSON.parse(JSON.stringify(INITIAL_COURSES)); // Deep copy
+            }
+
+            // アイコン初期化
+            lucide.createIcons();
+            
+            // ログインフォーム
+            document.getElementById('login-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                // 画面遷移
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('app-screen').classList.remove('hidden');
+                renderDashboard();
+            });
+
+            // 初期化ボタン
+            document.getElementById('reset-btn').addEventListener('click', () => {
+                if(confirm('全てのデータを初期状態に戻しますか？')) {
+                    localStorage.clear();
+                    window.location.reload();
+                }
+            });
+
+            // モーダル閉じるボタン
+            document.getElementById('close-modal-btn').addEventListener('click', closeModal);
+
+            // 保存ボタン
+            document.getElementById('save-course-btn').addEventListener('click', saveCourse);
+        });
+
+        // --- ビュー切り替え ---
+        function switchTab(tabName) {
+            const dashboardView = document.getElementById('view-dashboard');
+            const calendarView = document.getElementById('view-calendar');
+            const navDashboard = document.getElementById('nav-dashboard');
+            const navCalendar = document.getElementById('nav-calendar');
+
+            if (tabName === 'dashboard') {
+                dashboardView.classList.remove('hidden');
+                calendarView.classList.add('hidden');
+                
+                updateNavStyle(navDashboard, true);
+                updateNavStyle(navCalendar, false);
+            } else {
+                dashboardView.classList.add('hidden');
+                calendarView.classList.remove('hidden');
+                
+                updateNavStyle(navDashboard, false);
+                updateNavStyle(navCalendar, true);
+            }
+        }
+
+        function updateNavStyle(element, isActive) {
+            const iconBg = element.querySelector('div');
+            const text = element.querySelector('span');
+            const icon = element.querySelector('i'); // Lucideの置き換えでSVGになる可能性があるが、クラス操作は親でやる
+
+            if (isActive) {
+                element.classList.remove('text-slate-400');
+                element.classList.add('text-blue-600', '-translate-y-1');
+                iconBg.classList.add('bg-blue-50');
+                // アイコンの太さを変えるのはSVG操作が必要なため、色と背景だけで表現
+            } else {
+                element.classList.add('text-slate-400');
+                element.classList.remove('text-blue-600', '-translate-y-1');
+                iconBg.classList.remove('bg-blue-50');
+            }
+        }
+
+        // --- ロジック ---
+
+        function saveData() {
+            localStorage.setItem('unitSurvivalData', JSON.stringify(courses));
+        }
+
+        function calculateRemaining(course) {
+            const penaltyFromLates = Math.floor(course.lateCount / course.lateToAbsentRatio);
+            return course.absentLimit - (course.absentCount + penaltyFromLates);
+        }
+
+        function getStatusInfo(remaining) {
+            if (remaining < 0) return { 
+                cardClass: 'bg-gray-800 text-white border-gray-600', 
+                badgeColor: 'bg-gray-600',
+                text: '落単'
+            };
+            if (remaining <= 1) return { 
+                cardClass: 'bg-red-50 text-red-900 border-red-500', 
+                badgeColor: 'bg-red-500',
+                text: `あと ${remaining} 回`
+            };
+            if (remaining === 2) return { 
+                cardClass: 'bg-yellow-50 text-yellow-900 border-yellow-500', 
+                badgeColor: 'bg-yellow-500',
+                text: `あと ${remaining} 回`
+            };
+            return { 
+                cardClass: 'bg-white text-slate-800 border-green-500', 
+                badgeColor: 'bg-green-500',
+                text: `あと ${remaining} 回`
+            };
+        }
+
+        // --- レンダリング (メイン) ---
+        function renderDashboard() {
+            const container = document.getElementById('course-list');
+            container.innerHTML = '';
+
+            courses.forEach(course => {
+                const remaining = calculateRemaining(course);
+                const status = getStatusInfo(remaining);
+                
+                // カードHTML生成
+                const card = document.createElement('div');
+                card.className = `rounded-2xl shadow-sm border overflow-hidden transition-all ${status.cardClass}`;
+                
+                // 内部HTML
+                card.innerHTML = `
+                    <div class="p-4 relative">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1 pr-8">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-[10px] font-bold text-white px-2 py-0.5 rounded-full ${status.badgeColor}">
+                                        ${status.text}
+                                    </span>
+                                    <span class="text-xs font-bold opacity-60">${course.day}</span>
+                                </div>
+                                <h3 class="text-xl font-bold leading-tight mb-1">${course.name}</h3>
+                                <p class="text-xs opacity-70 font-medium">${course.room} | ${course.professor}</p>
+                            </div>
+                            <button class="edit-btn absolute top-4 right-4 p-2 bg-black/5 rounded-full hover:bg-black/10 active:scale-90 transition" data-id="${course.id}">
+                                <i data-lucide="edit-3" class="opacity-60 w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="px-4 pb-4 grid grid-cols-2 gap-3">
+                        <!-- 欠席カウンター -->
+                        <div class="bg-red-50/50 rounded-xl p-3 flex flex-col items-center justify-between border border-red-100/50">
+                            <span class="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-2">欠席</span>
+                            <div class="flex items-center justify-between w-full gap-2">
+                                <button class="count-btn w-10 h-10 rounded-full bg-white text-red-500 shadow-sm border border-red-100 flex items-center justify-center active:scale-90 transition" data-id="${course.id}" data-type="absent" data-delta="-1">
+                                    <i data-lucide="minus" class="w-5 h-5"></i>
+                                </button>
+                                <span class="text-2xl font-black text-slate-700">${course.absentCount}</span>
+                                <button class="count-btn w-10 h-10 rounded-full bg-red-500 text-white shadow-md shadow-red-200 flex items-center justify-center active:scale-90 active:bg-red-600 transition" data-id="${course.id}" data-type="absent" data-delta="1">
+                                    <i data-lucide="plus" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- 遅刻カウンター -->
+                        <div class="bg-yellow-50/50 rounded-xl p-3 flex flex-col items-center justify-between border border-yellow-100/50">
+                            <span class="text-[10px] font-bold text-yellow-600 uppercase tracking-widest mb-2">遅刻</span>
+                            <div class="flex items-center justify-between w-full gap-2">
+                                <button class="count-btn w-10 h-10 rounded-full bg-white text-yellow-600 shadow-sm border border-yellow-100 flex items-center justify-center active:scale-90 transition" data-id="${course.id}" data-type="late" data-delta="-1">
+                                    <i data-lucide="minus" class="w-5 h-5"></i>
+                                </button>
+                                <span class="text-2xl font-black text-slate-700">${course.lateCount}</span>
+                                <button class="count-btn w-10 h-10 rounded-full bg-yellow-400 text-white shadow-md shadow-yellow-200 flex items-center justify-center active:scale-90 active:bg-yellow-500 transition" data-id="${course.id}" data-type="late" data-delta="1">
+                                    <i data-lucide="plus" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                            <div class="mt-1 text-[9px] font-bold text-yellow-700/60">
+                                ${course.lateToAbsentRatio}回で欠席1
+                            </div>
+                        </div>
+                    </div>
+
+                    ${course.memo ? `
+                    <div class="px-4 pb-4">
+                        <div class="bg-slate-50/80 p-3 rounded-lg text-xs text-slate-600 font-medium">
+                            ${course.memo}
+                        </div>
+                    </div>` : ''}
+                `;
+
+                container.appendChild(card);
+            });
+
+            // 新しく追加されたDOM要素に対してアイコンを適用
+            lucide.createIcons();
+
+            // イベントリスナー設定
+            attachEventListeners();
+        }
+
+        // イベントリスナーのアタッチ (再描画のたびに呼ぶ)
+        function attachEventListeners() {
+            // カウントボタン
+            document.querySelectorAll('.count-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = parseInt(btn.dataset.id);
+                    const type = btn.dataset.type;
+                    const delta = parseInt(btn.dataset.delta);
+
+                    // 追加: 全ての操作で確認を行う
+                    let message = "";
+                    if (type === 'absent') {
+                        message = delta > 0 
+                            ? '欠席として記録しますか？' 
+                            : '欠席の記録を取り消しますか？（回数を減らします）';
+                    } else { // type === 'late'
+                        message = delta > 0 
+                            ? '遅刻として記録しますか？' 
+                            : '遅刻の記録を取り消しますか？（回数を減らします）';
+                    }
+
+                    // 確認ダイアログを表示
+                    if (!confirm(message)) {
+                        return; // キャンセル時は何もしない
+                    }
+
+                    updateCount(id, type, delta);
+                });
+            });
+
+            // 編集ボタン
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    // アイコンをクリックした場合も考慮してclosestで親ボタンを探す
+                    const targetBtn = e.target.closest('.edit-btn');
+                    if(targetBtn) {
+                        const id = parseInt(targetBtn.dataset.id);
+                        openModal(id);
+                    }
+                });
+            });
+        }
+
+        function updateCount(id, type, delta) {
+            const course = courses.find(c => c.id === id);
+            if (!course) return;
+
+            if (type === 'absent') {
+                course.absentCount = Math.max(0, course.absentCount + delta);
+            } else {
+                course.lateCount = Math.max(0, course.lateCount + delta);
+            }
+
+            saveData();
+            renderDashboard();
+        }
+
+        // --- モーダル制御 ---
+        function openModal(id) {
+            const course = courses.find(c => c.id === id);
+            if (!course) return;
+
+            // フォームに値をセット
+            document.getElementById('edit-id').value = course.id;
+            document.getElementById('edit-name').value = course.name;
+            document.getElementById('edit-professor').value = course.professor;
+            document.getElementById('edit-room').value = course.room;
+            document.getElementById('edit-absentLimit').value = course.absentLimit;
+            document.getElementById('edit-lateToAbsentRatio').value = course.lateToAbsentRatio;
+            document.getElementById('edit-memo').value = course.memo || '';
+            
+            // 評価
+            document.getElementById('edit-rating-fun').value = course.ratings.fun;
+            document.getElementById('val-fun').innerText = course.ratings.fun;
+            
+            document.getElementById('edit-rating-strictness').value = course.ratings.strictness;
+            document.getElementById('val-strictness').innerText = course.ratings.strictness;
+
+            document.getElementById('edit-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('edit-modal').classList.add('hidden');
+        }
+
+        function saveCourse() {
+            const id = parseInt(document.getElementById('edit-id').value);
+            const course = courses.find(c => c.id === id);
+            if (!course) return;
+
+            // 値の更新
+            course.name = document.getElementById('edit-name').value;
+            course.professor = document.getElementById('edit-professor').value;
+            course.room = document.getElementById('edit-room').value;
+            course.absentLimit = parseInt(document.getElementById('edit-absentLimit').value);
+            course.lateToAbsentRatio = parseInt(document.getElementById('edit-lateToAbsentRatio').value);
+            course.memo = document.getElementById('edit-memo').value;
+            
+            course.ratings.fun = parseInt(document.getElementById('edit-rating-fun').value);
+            course.ratings.strictness = parseInt(document.getElementById('edit-rating-strictness').value);
+
+            saveData();
+            renderDashboard();
+            closeModal();
+        }
+
+    </script>
+</body>
+</html>
