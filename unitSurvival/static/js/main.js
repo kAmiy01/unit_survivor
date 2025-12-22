@@ -1,10 +1,13 @@
 // --- CONSTANTS ---
 const ADMIN_PASSWORD = "admin";
 const GAME_OVER_TEXT = "GAME OVER";
+// プルダウン生成用の配列
+const DAYS = ["月", "火", "水", "木", "金", "土", "日", "他"];
+const PERIODS = [1, 2, 3, 4, 5, 6];
 
 // State
 let courses = [];
-let terms = []; // 【追加】学期データ
+let terms = []; 
 let pendingAction = null;
 let currentDate = new Date();
 
@@ -18,7 +21,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('app-screen').classList.remove('hidden');
         
-        // ログイン後に学期設定を確認するフローに変更
         await fetchCourses();
         await fetchTerms(); 
     });
@@ -35,8 +37,18 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('confirm-cancel').addEventListener('click', closeConfirm);
     document.getElementById('confirm-ok').addEventListener('click', executeConfirm);
 
-    // 【追加】学期設定保存ボタン
+    // 学期設定保存ボタン
     document.getElementById('save-terms-btn').addEventListener('click', saveTerms);
+
+    // 【追加】授業時間行の追加ボタン
+    const addScheduleBtn = document.getElementById('add-schedule-row-btn');
+    if(addScheduleBtn) {
+        addScheduleBtn.addEventListener('click', () => addScheduleRow());
+    }
+
+    // Range input listeners
+    document.getElementById('edit-rating-fun').addEventListener('input', (e) => document.getElementById('val-fun').innerText = e.target.value);
+    document.getElementById('edit-rating-strictness').addEventListener('input', (e) => document.getElementById('val-strict').innerText = e.target.value);
 });
 
 // --- API INTERACTIONS ---
@@ -50,25 +62,22 @@ async function fetchCourses() {
     }
 }
 
-// 【追加】学期データの取得
 async function fetchTerms() {
     try {
         const res = await fetch('/api/terms');
         terms = await res.json();
 
-        // 学期設定が空なら設定モーダルを強制表示
         if (terms.length === 0) {
             openTermModal();
         } else {
-            renderTermCheckboxes(); // 授業登録用チェックボックスの準備
-            renderCalendar();       // カレンダー描画（termsデータが必要なためここで呼ぶ）
+            renderTermCheckboxes(); 
+            renderCalendar();       
         }
     } catch (e) {
         console.error("Failed to fetch terms", e);
     }
 }
 
-// 【追加】学期データの保存
 async function saveTerms() {
     const inputs = [];
     for(let i=1; i<=4; i++) {
@@ -82,7 +91,6 @@ async function saveTerms() {
         });
     }
 
-    // 簡易バリデーション
     if(inputs.some(t => !t.start || !t.end)) {
         alert("全ての学期の開始日と終了日を入力してください。");
         return;
@@ -95,7 +103,7 @@ async function saveTerms() {
     });
 
     document.getElementById('term-modal').classList.add('hidden');
-    fetchTerms(); // リロードしてアプリを開始
+    fetchTerms(); 
 }
 
 async function apiAddCourse(data) {
@@ -184,7 +192,6 @@ function changeMonth(delta) {
 }
 
 function renderCalendar() {
-    // 学期データがまだロードされていない場合はスキップ
     if (!terms.length) return;
 
     const year = currentDate.getFullYear();
@@ -212,28 +219,22 @@ function renderCalendar() {
         const dayChar = dayChars[dayOfWeek];
         const isToday = new Date().toDateString() === dateObj.toDateString();
         
-        // 日付文字列の生成 (YYYY-MM-DD形式)
         const y = dateObj.getFullYear();
         const m = String(dateObj.getMonth() + 1).padStart(2, '0');
         const d = String(dateObj.getDate()).padStart(2, '0');
         const dateStr = `${y}-${m}-${d}`;
 
-        // 【修正】学期期間判定ロジックを追加
         const dayCourses = courses.filter(c => {
-            // 1. 曜日チェック
+            // 1. 曜日チェック（文字列に含まれているか）
             if (!c.day || !c.day.includes(dayChar)) return false;
 
             // 2. 学期チェック
-            // 授業に設定された学期IDリストを取得 (例: "1,2")
             const courseTermIds = (c.termIds || "1,2,3,4").split(',').map(Number);
-            
-            // 現在の日付が、その授業の対象学期の期間内か？
             const isInTerm = courseTermIds.some(tid => {
                 const term = terms.find(t => t.id === tid);
                 if (!term) return false;
                 return dateStr >= term.start && dateStr <= term.end;
             });
-
             return isInTerm;
         });
 
@@ -302,48 +303,22 @@ function calculateRemaining(course) {
 }
 
 function getStatusInfo(remaining) {
-    if (remaining < 0) return { 
-        cardClass: 'status-failed', 
-        textClass: 'text-muted glitch-text', 
-        label: '落単', 
-        badgeClass: 'badge-gray',
-        btnClass: 'btn-base'
-    };
-    if (remaining <= 1) return { 
-        cardClass: 'status-critical', 
-        textClass: 'text-red text-glow', 
-        label: '危険', 
-        badgeClass: 'badge-red',
-        btnClass: 'btn-grad-red'
-    };
-    if (remaining === 2) return { 
-        cardClass: 'status-warning', 
-        textClass: 'text-yellow text-glow', 
-        label: '注意', 
-        badgeClass: 'badge-yellow',
-        btnClass: 'btn-grad-yellow'
-    };
-    return { 
-        cardClass: 'status-active', 
-        textClass: 'text-blue', 
-        label: '履修中', 
-        badgeClass: 'badge-blue',
-        btnClass: 'btn-base'
-    };
+    if (remaining < 0) return { cardClass: 'status-failed', textClass: 'text-muted glitch-text', label: '落単', badgeClass: 'badge-gray', btnClass: 'btn-base' };
+    if (remaining <= 1) return { cardClass: 'status-critical', textClass: 'text-red text-glow', label: '危険', badgeClass: 'badge-red', btnClass: 'btn-grad-red' };
+    if (remaining === 2) return { cardClass: 'status-warning', textClass: 'text-yellow text-glow', label: '注意', badgeClass: 'badge-yellow', btnClass: 'btn-grad-yellow' };
+    return { cardClass: 'status-active', textClass: 'text-blue', label: '履修中', badgeClass: 'badge-blue', btnClass: 'btn-base' };
 }
 
 function renderDashboard() {
     const container = document.getElementById('course-list');
     container.innerHTML = '';
-
     courses.forEach(course => {
         const remaining = calculateRemaining(course);
         const status = getStatusInfo(remaining);
         const mainDisplayText = remaining < 0 ? GAME_OVER_TEXT : remaining;
-
+        
         const card = document.createElement('div');
         card.className = `course-card ${status.cardClass}`;
-        
         card.innerHTML = `
             <div class="card-header">
                 <div>
@@ -352,9 +327,9 @@ function renderDashboard() {
                         <span class="card-day">${course.day}</span>
                     </div>
                     <h3 class="card-title ${status.textClass}">${course.name}</h3>
-                    <p class="card-info">${course.room} // ${course.professor}</p>
+                    <p class="card-info">${course.room || '教室未設定'} // ${course.professor || '教員未設定'}</p>
                 </div>
-                <button class="btn-icon-sm edit-btn" data-id="${course.id}">
+                <button class="btn-icon-sm edit-btn" onclick="openModal(${course.id})">
                     <i data-lucide="settings-2"></i>
                 </button>
             </div>
@@ -369,34 +344,36 @@ function renderDashboard() {
                     <div class="display-label">遅刻換算</div>
                     <div class="display-sub-val"><span>${course.lateToAbsentRatio}</span> 遅刻 = 1 欠席</div>
                     <div class="display-label" style="margin-top:0.5rem;">上限</div>
-                    <div class="display-sub-val">${course.absentLimit}</div>
+                    <div class="display-sub-val"><span>${course.absentLimit}</span> 回</div>
                 </div>
             </div>
-            <div class="card-controls">
-                <div class="control-group">
-                    <div class="control-header">
-                        <span class="control-label text-red">欠席</span>
-                        <span class="control-val">${course.absentCount}</span>
+            <div class="card-controls" style="padding:1rem; display:flex; justify-content:space-between; gap:1rem; background-color:var(--matte-900);">
+                <div class="control-group" style="flex:1;">
+                    <div class="control-header" style="display:flex; justify-content:space-between; font-size:0.65rem; color:var(--text-muted); margin-bottom:0.25rem;">
+                        <span class="text-red" style="font-weight:bold;">欠席</span>
+                        <span style="font-family:var(--font-mono);">${course.absentCount}</span>
                     </div>
-                    <div class="btn-group">
-                        <button class="btn-ctrl btn-base count-btn" data-id="${course.id}" data-type="absent" data-delta="-1"><i data-lucide="minus"></i></button>
-                        <button class="btn-ctrl ${status.btnClass} count-btn" data-id="${course.id}" data-type="absent" data-delta="1"><i data-lucide="plus"></i></button>
+                    <div class="btn-group" style="display:flex;">
+                        <button class="btn btn-secondary count-btn" style="flex:1; border-radius:2px 0 0 2px;" data-id="${course.id}" data-type="absent" data-delta="-1"><i data-lucide="minus" style="width:12px;"></i></button>
+                        <button class="btn btn-red count-btn" style="flex:1; border-radius:0 2px 2px 0;" data-id="${course.id}" data-type="absent" data-delta="1"><i data-lucide="plus" style="width:12px;"></i></button>
                     </div>
                 </div>
-                <div class="control-group">
-                    <div class="control-header">
-                        <span class="control-label text-yellow">遅刻</span>
-                        <span class="control-val">${course.lateCount}</span>
+                <div class="control-group" style="flex:1;">
+                    <div class="control-header" style="display:flex; justify-content:space-between; font-size:0.65rem; color:var(--text-muted); margin-bottom:0.25rem;">
+                        <span class="text-yellow" style="font-weight:bold;">遅刻</span>
+                        <span style="font-family:var(--font-mono);">${course.lateCount}</span>
                     </div>
-                    <div class="btn-group">
-                        <button class="btn-ctrl btn-base count-btn" data-id="${course.id}" data-type="late" data-delta="-1"><i data-lucide="minus"></i></button>
-                        <button class="btn-ctrl ${status.btnClass} count-btn" data-id="${course.id}" data-type="late" data-delta="1"><i data-lucide="plus"></i></button>
+                    <div class="btn-group" style="display:flex;">
+                        <button class="btn btn-secondary count-btn" style="flex:1; border-radius:2px 0 0 2px;" data-id="${course.id}" data-type="late" data-delta="-1"><i data-lucide="minus" style="width:12px;"></i></button>
+                        <button class="btn btn-yellow count-btn" style="flex:1; border-radius:0 2px 2px 0;" data-id="${course.id}" data-type="late" data-delta="1"><i data-lucide="plus" style="width:12px;"></i></button>
                     </div>
                 </div>
             </div>
         `;
         container.appendChild(card);
     });
+    
+    // イベントリスナー再登録（HTMLを書き換えたため）
     lucide.createIcons();
     attachEventListeners();
 }
@@ -404,23 +381,31 @@ function renderDashboard() {
 function triggerDamageEffect() {
     document.body.classList.add('animate-shake');
     const overlay = document.getElementById('damage-overlay');
-    overlay.classList.add('active');
-    setTimeout(() => {
-        document.body.classList.remove('animate-shake');
-        overlay.classList.remove('active');
-    }, 500);
+    if(overlay) {
+        overlay.classList.add('active');
+        setTimeout(() => {
+            document.body.classList.remove('animate-shake');
+            overlay.classList.remove('active');
+        }, 500);
+    }
 }
 
 function attachEventListeners() {
     document.querySelectorAll('.count-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const id = parseInt(btn.dataset.id);
-            const type = btn.dataset.type;
-            const delta = parseInt(btn.dataset.delta);
+            // アイコンをクリックした場合も考慮して closest を使う
+            const target = e.target.closest('.count-btn');
+            if(!target) return;
+
+            const id = parseInt(target.dataset.id);
+            const type = target.dataset.type;
+            const delta = parseInt(target.dataset.delta);
             const msg = delta > 0 ? (type === 'absent' ? '欠席を記録しますか？' : '遅刻を記録しますか？') : '記録を取り消しますか？';
             
             showConfirm(msg, () => {
                 const course = courses.find(c => c.id === id);
+                if (!course) return;
+
                 const currentRem = calculateRemaining(course);
                 
                 // Optimistic Update
@@ -438,17 +423,18 @@ function attachEventListeners() {
             });
         });
     });
-    document.querySelectorAll('.edit-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const targetBtn = e.target.closest('.edit-btn');
-            if(targetBtn) openModal(parseInt(targetBtn.dataset.id));
-        });
-    });
 }
 
 // --- COMMON UI LOGIC ---
 function showConfirm(message, callback) {
-    document.getElementById('confirm-message').textContent = message;
+    // 汎用確認ダイアログを使う場合
+    // 今回は簡易的にHTML内のconfirm-modalを再利用
+    const title = document.getElementById('confirm-title');
+    const msg = document.getElementById('confirm-msg');
+    
+    if (title) title.innerText = "確認";
+    if (msg) msg.innerText = message;
+    
     document.getElementById('confirm-modal').classList.remove('hidden');
     pendingAction = callback;
 }
@@ -461,111 +447,175 @@ function executeConfirm() {
     closeConfirm();
 }
 
-// --- MODAL LOGIC & TERM SETTINGS ---
+// --- MODAL HELPERS (NEW) ---
 
-// 【追加】学期設定モーダルの表示（入力を4つ生成）
-function openTermModal() {
-    const container = document.getElementById('term-inputs-container');
-    container.innerHTML = '';
-    const currentYear = new Date().getFullYear();
-    const defaultDates = [
-        {s: `${currentYear}-04-01`, e: `${currentYear}-06-01`}, // 1Q
-        {s: `${currentYear}-06-02`, e: `${currentYear}-08-01`}, // 2Q
-        {s: `${currentYear}-09-20`, e: `${currentYear}-11-20`}, // 3Q
-        {s: `${currentYear}-11-21`, e: `${currentYear+1}-01-31`} // 4Q
-    ];
+// Helper: Add Schedule Row
+function addScheduleRow(initialDay = '月', initialPeriod = 1) {
+    const container = document.getElementById('schedule-container');
+    const row = document.createElement('div');
+    row.className = 'schedule-row';
 
-    for(let i=1; i<=4; i++) {
-        container.innerHTML += `
-            <div class="form-group" style="margin-bottom:1rem; border-bottom:1px solid #333; padding-bottom:1rem;">
-                <label class="text-blue">${i}学期 (Q${i})</label>
-                <div class="grid-2" style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
-                    <div>
-                        <span class="text-muted" style="font-size:0.6rem;">開始</span>
-                        <input type="date" id="term-start-${i}" value="${defaultDates[i-1].s}">
-                    </div>
-                    <div>
-                        <span class="text-muted" style="font-size:0.6rem;">終了</span>
-                        <input type="date" id="term-end-${i}" value="${defaultDates[i-1].e}">
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    document.getElementById('term-modal').classList.remove('hidden');
+    // Day Select
+    const daySelect = document.createElement('select');
+    daySelect.className = 'schedule-select day-select';
+    DAYS.forEach(d => {
+        const option = document.createElement('option');
+        option.value = d;
+        option.text = d + "曜";
+        if (d === initialDay) option.selected = true;
+        daySelect.appendChild(option);
+    });
+
+    // Period Select
+    const periodSelect = document.createElement('select');
+    periodSelect.className = 'schedule-select period-select';
+    PERIODS.forEach(p => {
+        const option = document.createElement('option');
+        option.value = p;
+        option.text = p + "限";
+        if (p == initialPeriod) option.selected = true;
+        periodSelect.appendChild(option);
+    });
+
+    // Remove Button
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn-icon-remove';
+    removeBtn.innerHTML = `<i data-lucide="x"></i>`;
+    removeBtn.onclick = () => row.remove();
+
+    row.appendChild(daySelect);
+    row.appendChild(periodSelect);
+    row.appendChild(removeBtn);
+
+    container.appendChild(row);
+    lucide.createIcons();
 }
 
-// 【追加】授業登録モーダル内のチェックボックス生成
-function renderTermCheckboxes() {
-    const container = document.getElementById('term-checkboxes');
-    container.innerHTML = terms.map(t => `
-        <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.75rem; cursor:pointer;">
-            <input type="checkbox" class="term-check" value="${t.id}" style="width:auto; height:auto; margin:0;" checked>
-            <span>${t.name}</span>
-        </label>
-    `).join('');
-}
-
+// Open Edit/Create Modal (UPDATED)
 function openModal(id) {
-    const isEdit = id !== null;
-    const course = isEdit ? courses.find(c => c.id === id) : null;
-    document.getElementById('modal-title-text').textContent = isEdit ? '設定モード' : '授業の追加';
+    const modal = document.getElementById('edit-modal');
+    const title = document.getElementById('modal-title-text');
+    const container = document.getElementById('schedule-container');
     
-    document.getElementById('edit-id').value = isEdit ? course.id : '';
-    document.getElementById('edit-name').value = isEdit ? course.name : '';
-    document.getElementById('edit-professor').value = isEdit ? course.professor : '';
-    document.getElementById('edit-room').value = isEdit ? course.room : '';
-    document.getElementById('edit-day').value = isEdit ? course.day : '';
-    document.getElementById('edit-absentLimit').value = isEdit ? course.absentLimit : '5';
-    document.getElementById('edit-lateToAbsentRatio').value = isEdit ? course.lateToAbsentRatio : '3';
-    document.getElementById('edit-memo').value = isEdit && course.memo ? course.memo : '';
-    document.getElementById('edit-rating-fun').value = isEdit ? course.ratings.fun : '3';
-    document.getElementById('edit-rating-strictness').value = isEdit ? course.ratings.strictness : '3';
-    
-    // Reset ranges visual
-    document.getElementById('val-fun').textContent = isEdit ? course.ratings.fun : '3';
-    document.getElementById('val-strictness').textContent = isEdit ? course.ratings.strictness : '3';
+    // Clear and Reset
+    container.innerHTML = '';
+    document.getElementById('edit-name-error').classList.add('hidden');
 
-    // 【追加】学期チェックボックスの状態反映
-    document.querySelectorAll('.term-check').forEach(cb => cb.checked = false);
-    if (isEdit) {
-        // 保存されているID（文字列）を配列にしてチェック
-        const ids = (course.termIds || "").split(',');
-        ids.forEach(tid => {
-            const cb = document.querySelector(`.term-check[value="${tid}"]`);
-            if(cb) cb.checked = true;
-        });
+    if (id === null) {
+        // Create Mode
+        title.innerText = "新規授業登録";
+        document.getElementById('edit-id').value = '';
+        document.getElementById('edit-name').value = '';
+        document.getElementById('edit-professor').value = '';
+        document.getElementById('edit-room').value = '';
+        
+        // Default 1 row
+        addScheduleRow('月', 1);
+        
+        document.getElementById('edit-absentLimit').value = 5;
+        document.getElementById('edit-lateToAbsentRatio').value = 3;
+        document.getElementById('edit-memo').value = '';
+        
+        // Reset Sliders
+        document.getElementById('edit-rating-fun').value = 3;
+        document.getElementById('val-fun').innerText = 3;
+        document.getElementById('edit-rating-strictness').value = 3;
+        document.getElementById('val-strict').innerText = 3; // HTMLのIDと合わせる
+        
+        // Checkboxes reset
+        document.querySelectorAll('.term-check').forEach(cb => cb.checked = true); // 新規はデフォルト全チェック
+
+        pendingAction = 'create';
     } else {
-        // 新規作成時はデフォルト全選択
-        document.querySelectorAll('.term-check').forEach(cb => cb.checked = true);
+        // Edit Mode
+        const course = courses.find(c => c.id == id);
+        if (!course) return;
+
+        title.innerText = "授業設定";
+        document.getElementById('edit-id').value = course.id;
+        document.getElementById('edit-name').value = course.name;
+        document.getElementById('edit-professor').value = course.professor || '';
+        document.getElementById('edit-room').value = course.room || '';
+
+        // Parse Schedule String (e.g., "月1 / 水3")
+        if (course.day) {
+            const slots = course.day.split(/[\s,\/]+/); 
+            let hasValidSlot = false;
+            slots.forEach(slot => {
+                const dayMatch = slot.match(/([月火水木金土日他])/);
+                const periodMatch = slot.match(/(\d+)/);
+                if (dayMatch && periodMatch) {
+                    addScheduleRow(dayMatch[1], periodMatch[1]);
+                    hasValidSlot = true;
+                }
+            });
+            if (!hasValidSlot) addScheduleRow('月', 1); // fallback
+        } else {
+            addScheduleRow('月', 1);
+        }
+
+        document.getElementById('edit-absentLimit').value = course.absentLimit;
+        document.getElementById('edit-lateToAbsentRatio').value = course.lateToAbsentRatio;
+        document.getElementById('edit-memo').value = course.memo || '';
+        
+        document.getElementById('edit-rating-fun').value = course.ratings.fun || 3;
+        document.getElementById('val-fun').innerText = course.ratings.fun || 3;
+        
+        document.getElementById('edit-rating-strictness').value = course.ratings.strictness || 3;
+        document.getElementById('val-strict').innerText = course.ratings.strictness || 3;
+
+        const termIds = course.termIds ? course.termIds.split(',') : [];
+        document.querySelectorAll('.term-check').forEach(cb => {
+            cb.checked = termIds.includes(cb.value);
+        });
+
+        pendingAction = 'update';
     }
 
-    document.getElementById('edit-modal').classList.remove('hidden');
+    modal.classList.remove('hidden');
 }
 
-function closeModal() {
-    document.getElementById('edit-modal').classList.add('hidden');
-}
-
+// Save Course (UPDATED)
 function saveCourse() {
     const idValue = document.getElementById('edit-id').value;
     const isNew = idValue === '';
+    
+    // Validation
+    const nameInput = document.getElementById('edit-name');
+    if (!nameInput.value.trim()) {
+        document.getElementById('edit-name-error').classList.remove('hidden');
+        return;
+    }
 
-    // 【追加】選択された学期IDをカンマ区切り文字列に
+    // Collect Schedules
+    const rows = document.querySelectorAll('.schedule-row');
+    let dayParts = [];
+    rows.forEach(row => {
+        const d = row.querySelector('.day-select').value;
+        const p = row.querySelector('.period-select').value;
+        dayParts.push(`${d}${p}`);
+    });
+    const dayString = dayParts.length > 0 ? dayParts.join(' / ') : '未定';
+
+    // Collect Terms
     const selectedTerms = Array.from(document.querySelectorAll('.term-check:checked'))
         .map(cb => cb.value)
         .join(',');
 
     const data = {
-        name: document.getElementById('edit-name').value || '名称未設定',
+        name: nameInput.value,
         professor: document.getElementById('edit-professor').value,
         room: document.getElementById('edit-room').value,
-        day: document.getElementById('edit-day').value || '月曜1限',
+        day: dayString, // 生成した文字列を送信
         absentLimit: parseInt(document.getElementById('edit-absentLimit').value) || 0,
         lateToAbsentRatio: parseInt(document.getElementById('edit-lateToAbsentRatio').value) || 3,
         memo: document.getElementById('edit-memo').value,
-        ratings: { fun: parseInt(document.getElementById('edit-rating-fun').value), strictness: parseInt(document.getElementById('edit-rating-strictness').value) },
-        termIds: selectedTerms // 追加
+        ratings: { 
+            fun: parseInt(document.getElementById('edit-rating-fun').value), 
+            strictness: parseInt(document.getElementById('edit-rating-strictness').value) 
+        },
+        termIds: selectedTerms
     };
     
     if (isNew) {
@@ -576,6 +626,49 @@ function saveCourse() {
     closeModal();
 }
 
-// Range input listeners
-document.getElementById('edit-rating-fun').addEventListener('input', (e) => document.getElementById('val-fun').textContent = e.target.value);
-document.getElementById('edit-rating-strictness').addEventListener('input', (e) => document.getElementById('val-strictness').textContent = e.target.value);
+function closeModal() {
+    document.getElementById('edit-modal').classList.add('hidden');
+    pendingAction = null;
+}
+
+// --- TERM MODAL HELPERS ---
+function openTermModal() {
+    const container = document.getElementById('term-inputs-container');
+    container.innerHTML = '';
+    const currentYear = new Date().getFullYear();
+    const defaultDates = [
+        {s: `${currentYear}-04-01`, e: `${currentYear}-06-01`}, 
+        {s: `${currentYear}-06-02`, e: `${currentYear}-08-01`}, 
+        {s: `${currentYear}-09-20`, e: `${currentYear}-11-20`}, 
+        {s: `${currentYear}-11-21`, e: `${currentYear+1}-01-31`} 
+    ];
+
+    for(let i=1; i<=4; i++) {
+        container.innerHTML += `
+            <div class="form-group" style="margin-bottom:1rem; border-bottom:1px solid #333; padding-bottom:1rem;">
+                <label class="text-blue">${i}学期 (Q${i})</label>
+                <div class="grid-2" style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+                    <div>
+                        <span class="text-muted" style="font-size:0.6rem;">開始</span>
+                        <input type="date" id="term-start-${i}" value="${defaultDates[i-1].s}" class="input-sm" style="background:#111; color:white; border:1px solid #333; padding:0.5rem; width:100%;">
+                    </div>
+                    <div>
+                        <span class="text-muted" style="font-size:0.6rem;">終了</span>
+                        <input type="date" id="term-end-${i}" value="${defaultDates[i-1].e}" class="input-sm" style="background:#111; color:white; border:1px solid #333; padding:0.5rem; width:100%;">
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    document.getElementById('term-modal').classList.remove('hidden');
+}
+
+function renderTermCheckboxes() {
+    const container = document.getElementById('term-checkboxes');
+    container.innerHTML = terms.map(t => `
+        <label style="display:flex; align-items:center; gap:0.25rem; font-size:0.75rem; cursor:pointer; color:var(--text-muted);">
+            <input type="checkbox" class="term-check" value="${t.id}" style="width:auto; height:auto; margin:0;">
+            <span>${t.name}</span>
+        </label>
+    `).join('');
+}
