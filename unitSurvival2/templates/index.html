@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>単位サバイバル PRO</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+    <div id="damage-overlay"></div>
+
+    <div id="login-screen" class="login-screen">
+        <div class="top-bar-accent"></div>
+        
+        <div class="login-container">
+            <div class="login-header">
+                <h1 class="app-title">単位<span>サバイバル</span></h1>
+                <div class="app-subtitle-wrapper">
+                    <div class="line"></div>
+                    <p class="app-subtitle">Academic Control System</p>
+                    <div class="line"></div>
+                </div>
+            </div>
+            <form id="login-form" class="login-form">
+                <div class="form-group">
+                    <label>学籍番号 / ID</label>
+                    <input type="text" placeholder="2024-XXXX" required>
+                </div>
+                <div class="form-group">
+                    <label>パスワード</label>
+                    <input type="password" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block btn-lg">
+                    システム起動
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="app-screen" class="app-screen hidden">
+
+        <header class="app-header">
+            <div class="header-content">
+                <div class="brand">
+                    <div class="brand-bar"></div>
+                    <h1 class="brand-text">
+                        単位<span>サバイバル</span>
+                    </h1>
+                </div>
+                <button id="reset-btn" class="btn btn-secondary btn-sm">
+                    初期化
+                </button>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <div id="view-dashboard" class="view-dashboard">
+                <div id="course-list" class="course-list"></div>
+                <div class="list-footer">
+                    <div class="line"></div>
+                    <p>End of List</p>
+                </div>
+            </div>
+
+            <div id="view-calendar" class="view-calendar hidden">
+                <div class="calendar-header">
+                    <h2 id="calendar-month-display"></h2>
+                    <div class="calendar-controls">
+                         <button onclick="changeMonth(-1)" class="btn-icon"><i data-lucide="chevron-left"></i></button>
+                         <button onclick="changeMonth(1)" class="btn-icon"><i data-lucide="chevron-right"></i></button>
+                    </div>
+                </div>
+
+                <div class="calendar-wrapper">
+                    <div class="calendar-weekdays">
+                        <div class="day sun">日</div>
+                        <div class="day">月</div>
+                        <div class="day">火</div>
+                        <div class="day">水</div>
+                        <div class="day">木</div>
+                        <div class="day">金</div>
+                        <div class="day sat">土</div>
+                    </div>
+                    <div id="calendar-grid" class="calendar-grid">
+                        </div>
+                </div>
+
+                <div id="daily-detail-panel" class="daily-detail-panel hidden">
+                    <h3 class="detail-title"><span id="detail-date"></span> の予定</h3>
+                    <div id="detail-list" class="detail-list"></div>
+                </div>
+            </div>
+        </main>
+
+        <button id="add-course-btn" class="btn-fab">
+            <i data-lucide="plus"></i>
+        </button>
+
+        <nav class="bottom-nav">
+            <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item active">
+                <div class="nav-icon-wrapper">
+                    <div id="nav-indicator-dash" class="nav-indicator active"></div>
+                    <i data-lucide="layers"></i>
+                </div>
+                <span class="nav-label">一覧</span>
+            </button>
+            
+            <button onclick="switchTab('calendar')" id="nav-calendar" class="nav-item">
+                <div class="nav-icon-wrapper">
+                    <div id="nav-indicator-cal" class="nav-indicator"></div>
+                    <i data-lucide="calendar-days"></i>
+                </div>
+                <span class="nav-label">カレンダー</span>
+            </button>
+    
+            <button class="nav-item disabled">
+               <div class="nav-icon-wrapper">
+                <i data-lucide="users"></i>
+               </div>
+              <span class="nav-label">共有</span>
+            </button>
+        </nav>
+    </div>
+
+    <div id="edit-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    <span class="status-dot"></span>
+                    <span id="modal-title-text">設定モード</span>
+                </h2>
+                <button id="close-modal-btn" class="btn-icon-sm">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-id">
+                
+                <div class="section">
+                    <h3 class="section-title text-blue">授業情報</h3>
+                    <div class="form-grid">
+                        <div class="form-group full-width">
+                            <label>授業名</label>
+                            <input type="text" id="edit-name" class="input-lg">
+                            <p id="edit-name-error" class="error-msg hidden">授業名を入力してください</p>
+                        </div>
+                        <div class="form-group">
+                            <label>担当教員</label>
+                            <input type="text" id="edit-professor">
+                        </div>
+                        <div class="form-group">
+                            <label>教室</label>
+                            <input type="text" id="edit-room">
+                        </div>
+                        
+                        <div class="form-group full-width">
+                            <label>曜日・時限</label>
+                            <div id="schedule-container"></div>
+                            <button type="button" id="add-schedule-row-btn" class="btn btn-outline-dashed">
+                                <i data-lucide="plus"></i> 授業時間を追加
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title text-yellow">開講学期</h3>
+                    <div class="panel-inset">
+                        <div class="flex-center gap-2" id="term-checkboxes" style="display: flex; flex-wrap: wrap; justify-content: space-around; padding: 1rem; background: var(--matte-900);">
+                            </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title text-red">サバイバル設定</h3>
+                    <div class="form-grid">
+                    <div class="form-group">
+                        <label for="edit-absentLimit">欠席許容回数 (0-5)</label>
+                        <input type="number" id="edit-absentLimit" class="input-lg text-center" min="0" max="5" placeholder="5">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit-lateToAbsentRatio">遅刻換算 (0-5)</label>
+                        <input type="number" id="edit-lateToAbsentRatio" class="input-lg text-center" min="0" max="5" placeholder="3">
+                        <div style="font-size: 0.6rem; color: var(--text-muted); margin-top: 0.25rem;">
+                            ※ 0設定で遅刻カウントなし
+                        </div>
+                    </div>
+                </div>
+                </div>
+
+                <div class="section">
+                     <h3 class="section-title text-muted">評価・メモ</h3>
+                     
+                     <div class="range-wrapper">
+                         <div class="range-header"><span>面白さ</span><span id="val-fun" class="range-val">3</span></div>
+                         <input type="range" id="edit-rating-fun" min="1" max="5" step="1">
+                     </div>
+
+                     <div class="range-wrapper">
+                        <div class="range-header"><span>厳しさ (高い=楽単)</span><span id="val-strict" class="range-val">3</span></div>
+                        <input type="range" id="edit-rating-strictness" min="1" max="5" step="1">
+                    </div>
+
+                    <div class="form-group" style="margin-top:1rem;">
+                        <label>メモ</label>
+                        <textarea id="edit-memo" rows="3" placeholder="備考など"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="save-course-btn" class="btn btn-primary btn-block">
+                    保存して閉じる
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="reset-modal" class="modal-overlay hidden">
+        <div class="dialog-overlay">
+            <div class="dialog-content login-container">
+                <div class="icon-lg text-red"><i data-lucide="alert-triangle" style="width:100%; height:100%;"></i></div>
+                <h3 class="text-red" style="margin:1rem 0;">システム初期化</h3>
+                <p class="text-muted" style="font-size:0.8rem; margin-bottom:1.5rem;">
+                    全ての授業データと履歴が消去されます。<br>この操作は取り消せません。
+                </p>
+                
+                <div class="form-group">
+                    <input type="password" id="reset-password" class="input-center" placeholder="PASSWORD">
+                    <p id="reset-error" class="error-msg hidden">パスワードが間違っています</p>
+                </div>
+                
+                <div class="dialog-actions">
+                    <button id="reset-cancel" class="btn btn-secondary">中止</button>
+                    <button id="reset-confirm-btn" class="btn btn-red">完全初期化</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="term-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">学期期間設定 (年度初め)</h2>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" style="font-size:0.8rem; margin-bottom:1rem;">
+                    各学期の開始日と終了日を設定してください。<br>
+                    この設定外の日付には授業が表示されません。
+                </p>
+                <form id="term-form">
+                    <div id="term-inputs-container">
+                        <div style="margin-bottom:1rem; border-bottom:1px solid #333; padding-bottom:1rem;">
+                            <label class="text-blue">1学期 (前期前半)</label>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+                                <input type="date" id="term-start-1" class="input-sm" style="background:#111; color:white; border:1px solid #333; padding:0.5rem;">
+                                <input type="date" id="term-end-1" class="input-sm" style="background:#111; color:white; border:1px solid #333; padding:0.5rem;">
+                            </div>
+                        </div>
+                        <div style="margin-bottom:1rem; border-bottom:1px solid #333; padding-bottom:1rem;">
+                            <label class="text-blue">2学期 (前期後半)</label>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+                                <input type="date" id="term-start-2" class="input-sm" style="background:#111; color:white; border:1px solid #333; padding:0.5rem;">
+                                <input type="date" id="term-end-2" class="input-sm" style="background:#111; color:white; border:1px solid #333; padding:0.5rem;">
+                            </div>
+                        </div>
+                        <div style="margin-bottom:1rem; border-bottom:1px solid #333; padding-bottom:1rem;">
+                            <label class="text-yellow">3学期 (後期前半)</label>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+                                <input type="date" id="term-start-3" class="input-sm" style="background:#111; color:white; border:1px solid #333; padding:0.5rem;">
+                                <input type="date" id="term-end-3" class="input-sm" style="background:#111; color:white; border:1px solid #333; padding:0.5rem;">
+                            </div>
+                        </div>
+                        <div style="margin-bottom:1rem;">
+                            <label class="text-yellow">4学期 (後期後半)</label>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+                                <input type="date" id="term-start-4" class="input-sm" style="background:#111; color:white; border:1px solid #333; padding:0.5rem;">
+                                <input type="date" id="term-end-4" class="input-sm" style="background:#111; color:white; border:1px solid #333; padding:0.5rem;">
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button id="save-terms-btn" class="btn btn-primary btn-block">
+                    設定を保存して開始
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="confirm-modal" class="modal-overlay hidden">
+         <div class="dialog-overlay">
+            <div class="dialog-content login-container">
+                <h3 id="confirm-title" style="margin-bottom:1rem;">確認</h3>
+                <p id="confirm-msg" class="text-muted" style="margin-bottom:1.5rem;"></p>
+                <div class="dialog-actions">
+                    <button id="confirm-cancel" class="btn btn-secondary">キャンセル</button>
+                    <button id="confirm-ok" class="btn btn-primary">OK</button>
+                </div>
+            </div>
+         </div>
+    </div>
+    
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
